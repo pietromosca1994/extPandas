@@ -19,3 +19,4 @@ from .extUtils import *
 '''
 
 from .dataframe import DataFrame
+from .utils import *

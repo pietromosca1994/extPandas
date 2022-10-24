@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 import numpy as np
 from skimage.util import view_as_windows
+from utils import shift
 # from fireTS.core.
 
 class DataFrame(pd.DataFrame):
@@ -136,10 +137,10 @@ class DataFrame(pd.DataFrame):
         
         return data_as_windows_3D
 
-    def NARX(self, ex_order: List,
-                    ex_delay: List,
-                    auto_order: int,
-                    pred_step: int ):
+    def NARX(self, ex_order: List = None,
+                    ex_delay: List = None,
+                    auto_order: int = None,
+                    pred_step: int = None):
         '''Method for processing the data in a NARX fashion.
             y(t+k)=f(y(t), ..., y(t-p+1), 
                     x1(t-d1), ..., x1(t-d1-q1+1), ...
@@ -150,5 +151,11 @@ class DataFrame(pd.DataFrame):
                 p (auto_order): auto order
                 k (pred_step): prediction step
         '''
+        # shift dataframe 
+        for d, column in enumerate(self.columns):
+            #self[column]=self.columns.shift(ex_delay[d])
+            
+            self[column]=shift(self[column], ex_delay[d])
 
+            return None
         

@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 import numpy as np
 from skimage.util import view_as_windows
-from utils import shift
+# from utils import shift
 # from fireTS.core.
 
-class DataFrame(pd.DataFrame):
+class extDataFrame(pd.DataFrame):
     def __init__(self, *args, **kwargs):
-        super(DataFrame, self).__init__(*args, **kwargs)
+        super(extDataFrame, self).__init__(*args, **kwargs)
 
         self.scaler=None
 
@@ -93,15 +93,20 @@ class DataFrame(pd.DataFrame):
         
         self.__init__(data=scaler.transform(self.values), columns=self.columns)
         self.scaler=scaler
-
+        
         return None
 
     def InverseTransform(self,
+                            scaler=None,
                              *args, **kwargs):
         '''Method for inverse transforming a dataset
         '''
-        self.__init__(self.scaler.inverse_transform(self.values), columns=self.columns)
-
+        if scaler==None:
+            scaler=self.scaler
+            
+        self.__init__(scaler.inverse_transform(self.values), columns=self.columns)
+        self.scaler=scaler
+        
         return None
 
     def getCorrMatrix(self, *args, **kwargs):
@@ -137,25 +142,25 @@ class DataFrame(pd.DataFrame):
         
         return data_as_windows_3D
 
-    def NARX(self, ex_order: List = None,
-                    ex_delay: List = None,
-                    auto_order: int = None,
-                    pred_step: int = None):
-        '''Method for processing the data in a NARX fashion.
-            y(t+k)=f(y(t), ..., y(t-p+1), 
-                    x1(t-d1), ..., x1(t-d1-q1+1), ...
-                    xm(t-dm), ..., xm(t-dm-qm+1), e(t))
-            Where:
-                q (ex_order): exogenous order 
-                d (ex_delay): exogenous delay 
-                p (auto_order): auto order
-                k (pred_step): prediction step
-        '''
-        # shift dataframe 
-        for d, column in enumerate(self.columns):
-            #self[column]=self.columns.shift(ex_delay[d])
-            
-            self[column]=shift(self[column], ex_delay[d])
-
-            return None
+    #def NARX(self, ex_order: List = None,
+    #                ex_delay: List = None,
+    #                auto_order: int = None,
+    #                pred_step: int = None):
+    #    '''Method for processing the data in a NARX fashion.
+    #        y(t+k)=f(y(t), ..., y(t-p+1), 
+    #                x1(t-d1), ..., x1(t-d1-q1+1), ...
+    #                xm(t-dm), ..., xm(t-dm-qm+1), e(t))
+    #        Where:
+    #            q (ex_order): exogenous order 
+    #            d (ex_delay): exogenous delay 
+    #            p (auto_order): auto order
+    #            k (pred_step): prediction step
+    #    '''
+    #    # shift dataframe 
+    #    for d, column in enumerate(self.columns):
+    #        #self[column]=self.columns.shift(ex_delay[d])
+    #        
+    #        self[column]=shift(self[column], ex_delay[d])
+    #
+    #        return None
         

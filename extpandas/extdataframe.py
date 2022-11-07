@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 import seaborn as sn
 import numpy as np
 from skimage.util import view_as_windows
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import plotly
+
 # from utils import shift
 # from fireTS.core.
 
@@ -141,6 +145,68 @@ class extDataFrame(pd.DataFrame):
         #self.__init__(data_as_windows, columns=self.columns)
         
         return data_as_windows_3D
+
+    def plotDistribution(self,
+                            nbins=50) -> plotly.graph_objs.Figure:
+        '''Function to plot data distribution
+
+        :returns: fig
+
+        :rtype: plotly.graph_objs.Figure     
+        '''
+        fig = make_subplots(rows=len(self.columns), cols=1)
+
+        for row in range(len(self.columns)):
+            fig.add_trace(
+                go.Histogram(x=self[self.columns[row]], nbinsx=nbins, name=self.columns[row]),
+                row=row+1, col=1
+            )
+        #            
+        # if len(self.columns)==1:
+        #         fig.add_trace(
+        #         go.Histogram(x=self[self.columns[0]], nbinsx=20, name=self.columns[0]),
+        #         row=1, col=1
+        #     )
+        # else:
+        #     for row in range(1, len(self.columns)):
+        #         fig.add_trace(
+        #             go.Histogram(x=self[self.columns[row-1]], nbinsx=20, name=self.columns[row-1]),
+        #             row=row, col=1
+        #         )
+        
+        return fig
+
+    def removeOutliers(self, method):
+        ''' Method to remove outliers from data 
+
+        '''
+        # for col in self.columns:
+        #     if pd.api.types.is_numeric_dtype(self[col]):  # check for numerical data 
+        #         percentiles = self[col].quantile([0.01,0.95]).values
+        #         self[col][self[col] <= percentiles[0]] = percentiles[0]
+        #         self[col][self[col] >= percentiles[1]] = percentiles[1]
+        #     else:
+        #         self[col]=self[col] 
+        if method=='IQR':
+            self=self.IQR_method(self, 70, 20)
+
+        
+        self.__init__(data=self.values, columns=self.columns)        
+        return self
+
+    def IQR_method(self, data, hi_quantile, lo_quantile):
+        ''' InterQuantile Range Method
+        '''
+        for col in data.columns:
+            if pd.api.types.is_numeric_dtype(data[col]):  # check for numerical data 
+                Qlow = np.percentile(data[col], lo_quantile)
+                Qhigh = np.percentile(data[col], hi_quantile)
+                IQR = Qhigh - Qlow
+
+                data[col].iloc[data[col] <= Qlow - 1.5 * IQR]= Qlow
+                data[col].iloc[data[col] >= Qhigh + 1.5 * IQR] = Qhigh
+        
+        return data 
 
     #def NARX(self, ex_order: List = None,
     #                ex_delay: List = None,

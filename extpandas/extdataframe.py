@@ -21,6 +21,8 @@ class extDataFrame(pd.DataFrame):
         super(extDataFrame, self).__init__(*args, **kwargs)
 
         self.scaler=None
+    
+        return None
 
     @property
     def _constructor(self):
@@ -176,25 +178,22 @@ class extDataFrame(pd.DataFrame):
         
         return fig
 
-    def removeOutliers(self, method):
+    def removeOutliers(self, columns=None, method='IQR', *args, **kwargs):
         ''' Method to remove outliers from data 
 
         '''
-        # for col in self.columns:
-        #     if pd.api.types.is_numeric_dtype(self[col]):  # check for numerical data 
-        #         percentiles = self[col].quantile([0.01,0.95]).values
-        #         self[col][self[col] <= percentiles[0]] = percentiles[0]
-        #         self[col][self[col] >= percentiles[1]] = percentiles[1]
-        #     else:
-        #         self[col]=self[col] 
+        if columns==None:
+            columns=self.columns
+
         if method=='IQR':
-            self=self.IQR_method(self, 70, 20)
+            self.loc[:, columns]=self.IQR_method(data=self.loc[:, columns], *args, **kwargs)
+      
+        return None
 
-        
-        self.__init__(data=self.values, columns=self.columns)        
-        return self
-
-    def IQR_method(self, data, hi_quantile, lo_quantile):
+    def IQR_method(self, 
+                    data,
+                    lo_quantile: float =10,
+                    hi_quantile: float =90):
         ''' InterQuantile Range Method
         '''
         for col in data.columns:
@@ -202,31 +201,50 @@ class extDataFrame(pd.DataFrame):
                 Qlow = np.percentile(data[col], lo_quantile)
                 Qhigh = np.percentile(data[col], hi_quantile)
                 IQR = Qhigh - Qlow
+                outliers_count=sum(data[col] <= Qlow - 1.5 * IQR)+sum(data[col] >= Qhigh + 1.5 * IQR)
+                print('[INFO] Found ', outliers_count, ' outliers in ', col)
+                
+                # data.iloc[data[col].values <= Qlow - 1.5 * IQR, data.columns.get_loc(col)]= Qlow
+                # data.iloc[data[col].values >= Qhigh + 1.5 * IQR, data.columns.get_loc(col)]= Qhigh
 
-                data[col].iloc[data[col] <= Qlow - 1.5 * IQR]= Qlow
-                data[col].iloc[data[col] >= Qhigh + 1.5 * IQR] = Qhigh
+                data.loc[:, col].mask(data[col] <= Qlow - 1.5 * IQR, Qlow, inplace=True)
+                data.loc[:, col].mask(data[col] >= Qhigh + 1.5 * IQR, Qhigh, inplace=True)
         
         return data 
 
-    #def NARX(self, ex_order: List = None,
-    #                ex_delay: List = None,
-    #                auto_order: int = None,
-    #                pred_step: int = None):
-    #    '''Method for processing the data in a NARX fashion.
-    #        y(t+k)=f(y(t), ..., y(t-p+1), 
-    #                x1(t-d1), ..., x1(t-d1-q1+1), ...
-    #                xm(t-dm), ..., xm(t-dm-qm+1), e(t))
-    #        Where:
-    #            q (ex_order): exogenous order 
-    #            d (ex_delay): exogenous delay 
-    #            p (auto_order): auto order
-    #            k (pred_step): prediction step
-    #    '''
-    #    # shift dataframe 
-    #    for d, column in enumerate(self.columns):
-    #        #self[column]=self.columns.shift(ex_delay[d])
-    #        
-    #        self[column]=shift(self[column], ex_delay[d])
-    #
-    #        return None
+    def NARX(self, ex_order: List = None,
+                   ex_delay: List = None,
+                   auto_order: int = None,
+                   pred_step: int = None,
+                   inplace: bool =False):
+        '''Method for processing the data in a NARX fashion.
+            y(t+k)=f(y(t), ..., y(t-p+1), 
+                    x1(t-d1), ..., x1(t-d1-q1+1), ...
+                    xm(t-dm), ..., xm(t-dm-qm+1), e(t))
+            Where:
+                q (ex_order): exogenous order 
+                d (ex_delay): exogenous delay 
+                p (auto_order): auto order
+                k (pred_step): prediction step
+        '''
+        NARX=pd.DataFrame()      
+       
+        for d, column in enumerate(self.columns):
+            #self[column]=self.columns.shift(ex_delay[d])
+            index=[]
+            for i in range(ex_order[d]+1):
+                index.append(column+'_d'+str(ex_delay[d])+'_o'+str(i))
+            #NARX_row=pd.concat([NARX_row, pd.DataFrame(self[column].shift(ex_delay[d]).values[:ex_order[d]], index=index)], axis=1)
+
+            NARX=pd.concat([NARX, pd.DataFrame(view_as_windows(np.array(self[column].shift(ex_delay[d])), ex_order[d]+1), columns=index)], axis=1)
+        
+        # drop NaNM due to delay 
+        NARX.dropna(inplace=True)
+
+        if inplace==True:
+            self.__init__(data=NARX.values, columns=NARX.columns)
+            return None
+        else:
+            return NARX
+
         

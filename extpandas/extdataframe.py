@@ -12,9 +12,8 @@ from skimage.util import view_as_windows
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import plotly
-
-# from utils import shift
-# from fireTS.core.
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 class extDataFrame(pd.DataFrame):
     def __init__(self, *args, **kwargs):
@@ -116,18 +115,49 @@ class extDataFrame(pd.DataFrame):
         return None
 
     def getCorrMatrix(self, *args, **kwargs):
-        '''Method for inverse transforming a dataset
+        '''Method for inverse transforming a dataset.
+        The Pearson correlation coefficient [1] measures the linear relationship between two datasets. 
+        The Spearman rank-order correlation coefficient is a nonparametric measure of the monotonicity of the relationship between two datasets. 
+        Kendall’s tau is a measure of the correspondence between two rankings. 
 
         :returns: CorrMatrix
        
         :rtype: extpandas.DataFrame
         '''
-        plt.figure()
-        CorrMatrix=self.corr(*args, **kwargs)
-        sn.heatmap(CorrMatrix, annot=True)
-        plt.show()
+        # Pearson Correlation (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html)
+        # The Pearson correlation coefficient [1] measures the linear relationship between two datasets. 
+        # Like other correlation coefficients, this one varies between -1 and +1 with 0 implying no correlation. 
+        # Correlations of -1 or +1 imply an exact linear relationship. 
+        # Positive correlations imply that as x increases, so does y. 
+        # Negative correlations imply that as x increases, y decreases.
+        pearson_CorrMatrix=np.round(self.corr(method='pearson', *args, **kwargs), 2)
 
-        return CorrMatrix
+        # Spearman Correlation (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html)
+        # The Spearman rank-order correlation coefficient is a nonparametric measure of the monotonicity of the relationship between two datasets. 
+        # Unlike the Pearson correlation, the Spearman correlation does not assume that both datasets are normally distributed. 
+        # Like other correlation coefficients, this one varies between -1 and +1 with 0 implying no correlation. 
+        # Correlations of -1 or +1 imply an exact monotonic relationship. Positive correlations imply that as x increases, so does y.
+        #  Negative correlations imply that as x increases, y decreases.
+        spearman_CorrMatrix=np.round(self.corr(method='spearman', *args, **kwargs), 2)
+
+        # Kendall’s tau is a measure of the correspondence between two rankings. 
+        # Values close to 1 indicate strong agreement, and values close to -1 indicate strong disagreement. 
+        # This implements two variants of Kendall’s tau: tau-b (the default) and tau-c (also known as Stuart’s tau-c). 
+        # These differ only in how they are normalized to lie within the range -1 to 1; the hypothesis tests (their p-values) are identical. 
+        # Kendall’s original tau-a is not implemented separately because both tau-b and tau-c reduce to tau-a in the absence of ties.
+        kendall_CorrMatrix=np.round(self.corr(method='kendall', *args, **kwargs), 2)
+
+        fig1=px.imshow(pearson_CorrMatrix, text_auto=True, title="Pearson's Correlation")
+        fig2=px.imshow(spearman_CorrMatrix, text_auto=True, title="Spearman's Correlation")
+        fig3=px.imshow(kendall_CorrMatrix, text_auto=True, title="Kendall's Correlation")
+
+        # plot figure
+        fig = make_subplots(rows=1, cols=3, shared_xaxes=True, shared_yaxes=True, subplot_titles=("Pearson's Correlation", "Spearman's Correlation", "Kendall's Correlation"))
+        fig.add_trace(fig1['data'][0], row=1, col=1)
+        fig.add_trace(fig2['data'][0], row=1, col=2)
+        fig.add_trace(fig3['data'][0], row=1, col=3)
+        
+        return fig
 
     def ViewAsWindows(self,
                         window_length: int):
@@ -201,8 +231,9 @@ class extDataFrame(pd.DataFrame):
                 Qlow = np.percentile(data[col], lo_quantile)
                 Qhigh = np.percentile(data[col], hi_quantile)
                 IQR = Qhigh - Qlow
-                outliers_count=sum(data[col] <= Qlow - 1.5 * IQR)+sum(data[col] >= Qhigh + 1.5 * IQR)
-                print('[INFO] Found ', outliers_count, ' outliers in ', col)
+                outliers_count=sum(data[col] <= Qlow - 1.5 * IQR)+sum(data[col] >= Qhigh + 1.5 * IQR) # outliers count 
+                outliers_perc=round(outliers_count/data.shape[0]*100, 2)    # outliers percentage        
+                print('[INFO] Found ', outliers_count, ' (', outliers_perc, '%) outliers in ', col)
                 
                 # data.iloc[data[col].values <= Qlow - 1.5 * IQR, data.columns.get_loc(col)]= Qlow
                 # data.iloc[data[col].values >= Qhigh + 1.5 * IQR, data.columns.get_loc(col)]= Qhigh

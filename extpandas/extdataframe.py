@@ -147,6 +147,12 @@ class extDataFrame(pd.DataFrame):
         # Kendall’s original tau-a is not implemented separately because both tau-b and tau-c reduce to tau-a in the absence of ties.
         kendall_CorrMatrix=np.round(self.corr(method='kendall', *args, **kwargs), 2)
 
+        mat={
+            'pearson_CorrMatrix': pearson_CorrMatrix,
+            'spearman_CorrMatrix': spearman_CorrMatrix,
+            'kendall_CorrMatrix': kendall_CorrMatrix
+        }
+
         fig1=px.imshow(pearson_CorrMatrix, text_auto=True, title="Pearson's Correlation")
         fig2=px.imshow(spearman_CorrMatrix, text_auto=True, title="Spearman's Correlation")
         fig3=px.imshow(kendall_CorrMatrix, text_auto=True, title="Kendall's Correlation")
@@ -157,7 +163,14 @@ class extDataFrame(pd.DataFrame):
         fig.add_trace(fig2['data'][0], row=1, col=2)
         fig.add_trace(fig3['data'][0], row=1, col=3)
         
-        return fig
+        return fig, mat
+
+    def getCorr(self, feature, method='pearson', *args, **kwargs):
+        _, mat=self.getCorrMatrix()
+        CorrMatrix=mat[method+'_CorrMatrix']
+        CorrMatrix=CorrMatrix[feature].drop(feature).abs().sort_values(by=feature, ascending=False)
+
+        return CorrMatrix
 
     def ViewAsWindows(self,
                         window_length: int):
@@ -179,6 +192,7 @@ class extDataFrame(pd.DataFrame):
         return data_as_windows_3D
 
     def plotDistribution(self,
+                            type='violin',
                             nbins=50) -> plotly.graph_objs.Figure:
         '''Function to plot data distribution
 
@@ -186,13 +200,20 @@ class extDataFrame(pd.DataFrame):
 
         :rtype: plotly.graph_objs.Figure     
         '''
-        fig = make_subplots(rows=len(self.columns), cols=1)
+        if type=='hist':
+            fig = make_subplots(rows=len(self.columns), cols=1)
 
-        for row in range(len(self.columns)):
-            fig.add_trace(
-                go.Histogram(x=self[self.columns[row]], nbinsx=nbins, name=self.columns[row]),
-                row=row+1, col=1
-            )
+            for row in range(len(self.columns)):
+                fig.add_trace(
+                    go.Histogram(x=self[self.columns[row]], nbinsx=nbins, name=self.columns[row]),
+                    row=row+1, col=1
+                )
+        elif type=='violin':
+            fig = make_subplots(rows=1, cols=len(self.columns))
+            for col in range(len(self.columns)):
+                graph=px.violin(self, y=self.columns[col], box=True, labels=self.columns[col])
+                fig.add_traces(graph.data, rows=1, cols=col+1)
+
         #            
         # if len(self.columns)==1:
         #         fig.add_trace(
@@ -208,7 +229,7 @@ class extDataFrame(pd.DataFrame):
         
         return fig
 
-    def removeOutliers(self, columns=None, method='IQR', *args, **kwargs):
+    def removeOutliers(self, columns=None, method='IQR', treatment='remove', *args, **kwargs):
         ''' Method to remove outliers from data 
 
         '''
@@ -216,14 +237,15 @@ class extDataFrame(pd.DataFrame):
             columns=self.columns
 
         if method=='IQR':
-            self.loc[:, columns]=self.IQR_method(data=self.loc[:, columns], *args, **kwargs)
+            self.loc[:, columns]=self.IQR_method(data=self.loc[:, columns], treatment=treatment, *args, **kwargs)
       
         return None
 
     def IQR_method(self, 
                     data,
                     lo_quantile: float =10,
-                    hi_quantile: float =90):
+                    hi_quantile: float =90,
+                    treatment='remove'):
         ''' InterQuantile Range Method
         '''
         for col in data.columns:
@@ -238,8 +260,12 @@ class extDataFrame(pd.DataFrame):
                 # data.iloc[data[col].values <= Qlow - 1.5 * IQR, data.columns.get_loc(col)]= Qlow
                 # data.iloc[data[col].values >= Qhigh + 1.5 * IQR, data.columns.get_loc(col)]= Qhigh
 
-                data.loc[:, col].mask(data[col] <= Qlow - 1.5 * IQR, Qlow, inplace=True)
-                data.loc[:, col].mask(data[col] >= Qhigh + 1.5 * IQR, Qhigh, inplace=True)
+                if treatment=='correct':
+                    data.loc[:, col].mask(data[col] <= Qlow - 1.5 * IQR, Qlow, inplace=True)
+                    data.loc[:, col].mask(data[col] >= Qhigh + 1.5 * IQR, Qhigh, inplace=True)
+                elif treatment=='remove':
+                    data.loc[:, col].drop(data[data[col] <= Qlow - 1.5 * IQR].index, inplace=True)
+                    data.loc[:, col].drop(data[data[col] >= Qhigh + 1.5 * IQR].index, inplace=True)
         
         return data 
 
